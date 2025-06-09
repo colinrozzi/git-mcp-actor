@@ -1,0 +1,13 @@
+name = "git-mcp-actor"
+version = "0.1.0"
+component = "/Users/colinrozzi/work/actor-registry/git-mcp-actor/./target/wasm32-unknown-unknown/release/git_mcp_actor.wasm"
+
+[[handlers]]
+type = "message-server"
+
+[handlers.config]
+
+[[handlers]]
+type = "runtime"
+
+[handlers.config]

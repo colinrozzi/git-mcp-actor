@@ -1,6 +1,10 @@
-package component:git-mcp-actor;
+package colinrozzi:git-mcp-actor;
 
 /// An example world for the component to target.
-world example {
-    export hello-world: func() -> string;
+world default {
+    import theater:simple/runtime;
+    import theater:simple/message-server-host;
+
+    export theater:simple/actor;
+    export theater:simple/message-server-client;
 }

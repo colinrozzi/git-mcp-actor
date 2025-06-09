@@ -5,6 +5,9 @@ edition = "2024"
 
 [dependencies]
 wit-bindgen-rt = { version = "0.42.1", features = ["bitflags"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+mcp-protocol = "0.2.5"
 
 [lib]
 crate-type = ["cdylib"]
@@ -12,4 +15,5 @@ crate-type = ["cdylib"]
 [package.metadata.component]
 package = "component:git-mcp-actor"
 
-[package.metadata.component.dependencies]
+[package.metadata.component.target.dependencies]
+"theater:simple" = { path = "./wit/deps/theater-simple" }
