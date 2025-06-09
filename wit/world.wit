@@ -4,7 +4,9 @@ package colinrozzi:git-mcp-actor;
 world default {
     import theater:simple/runtime;
     import theater:simple/message-server-host;
+    import theater:simple/supervisor;
 
     export theater:simple/actor;
     export theater:simple/message-server-client;
+    export theater:simple/supervisor-handlers;
 }

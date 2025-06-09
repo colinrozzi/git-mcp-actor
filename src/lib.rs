@@ -4,18 +4,25 @@ mod bindings;
 use bindings::exports::theater::simple::actor::Guest;
 use bindings::exports::theater::simple::message_server_client::ChannelAccept;
 use bindings::exports::theater::simple::message_server_client::Guest as MessageServerClient;
+use bindings::exports::theater::simple::supervisor_handlers::Guest as SupervisorHandlers;
+use bindings::exports::theater::simple::supervisor_handlers::WitActorError;
+use bindings::theater::simple::message_server_host::respond_to_request;
 use bindings::theater::simple::runtime::log;
+use bindings::theater::simple::supervisor::spawn;
 use mcp_protocol::tool::Tool;
 use mcp_protocol::tool::ToolCallResult;
 use mcp_protocol::tool::ToolContent;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use serde_json::json;
+use std::collections::HashMap;
 
 struct Component;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-struct State;
+struct State {
+    outstanding_requests: HashMap<String, String>,
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct McpRequest {
@@ -52,6 +59,19 @@ struct McpError {
     data: Option<Value>,
 }
 
+/// Result structure returned on shutdown
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct GitCommandResult {
+    pub success: bool,
+    pub exit_code: Option<i32>,
+    pub stdout: String,
+    pub stderr: String,
+    pub command: Vec<String>,
+    pub execution_time_ms: Option<u64>,
+    pub error: Option<String>,
+    pub repository_path: String,
+}
+
 impl Guest for Component {
     fn init(state: Option<Vec<u8>>, params: (String,)) -> Result<(Option<Vec<u8>>,), String> {
         // Initialize the component with the provided state and parameters
@@ -60,19 +80,24 @@ impl Guest for Component {
             state, params
         );
 
-        // Return the updated state
-        Ok((state,)) // Returning the same state for simplicity
+        let app_state = State {
+            outstanding_requests: HashMap::new(),
+        };
+
+        Ok((Some(
+            serde_json::to_vec(&app_state).map_err(|e| e.to_string())?,
+        ),))
     }
 }
 
 impl MessageServerClient for Component {
     fn handle_send(
         state: Option<Vec<u8>>,
-        params: (Vec<u8>,),
+        _params: (Vec<u8>,),
     ) -> Result<(Option<Vec<u8>>,), String> {
         log("Handling send message");
 
-        let mut app_state: State = match state {
+        let app_state: State = match state {
             Some(state_bytes) if !state_bytes.is_empty() => serde_json::from_slice(&state_bytes)
                 .map_err(|e| format!("Failed to deserialize state: {}", e))?,
             _ => return Err("Invalid state".to_string()),
@@ -109,34 +134,46 @@ impl MessageServerClient for Component {
         };
 
         // Process the request based on its type
-        let mcp_response = match request {
+        let response = match request {
             McpActorRequest::ToolsList {} => {
                 log("Received tools_list request");
 
                 let tools = vec![Tool {
-                    name: "example_tool".to_string(),
-                    description: Some("An example tool".to_string()),
+                    name: "git-command".to_string(),
+                    description: Some("Run a git command".to_string()),
                     input_schema: json!({
                         "type": "object",
                         "properties": {
-                            "example_param": {
+                            "repository_path": {
                                 "type": "string",
-                                "description": "An example parameter"
+                                "description": "The path of the git repo"
+                            },
+                            "args" : {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                },
+                                "description": "Arguments to pass to the git command"
                             }
                         },
-                        "required": ["example_param"]
+                        "required": ["repository_path"]
                     }),
                     annotations: None,
                 }];
 
-                McpResponse {
+                log(&format!("Available tools: {:?}", tools));
+                let res = McpResponse {
                     jsonrpc: "2.0".to_string(),
                     id: request_id,
                     result: Some(json!({
                         "tools": tools
                     })),
                     error: None,
-                }
+                };
+                Some(
+                    serde_json::to_vec(&res)
+                        .map_err(|e| format!("Failed to serialize response: {}", e))?,
+                )
             }
 
             McpActorRequest::ToolsCall { name, args } => {
@@ -144,30 +181,51 @@ impl MessageServerClient for Component {
                 log(&format!("Tool name: {}", name));
 
                 match name.as_str() {
-                    "example_tool" => {
-                        log("Processing example_tool call");
+                    "git-command" => {
+                        log("Processing git-command call");
 
-                        let result = ToolCallResult {
-                            content: vec![ToolContent::Text {
-                                text: "This is an example response from the tool.".to_string(),
-                            }],
-                            is_error: None,
-                        };
+                        let repository_path = args
+                            .get("repository_path")
+                            .and_then(Value::as_str)
+                            .ok_or("Missing 'repository_path' argument")?;
 
-                        McpResponse {
-                            jsonrpc: "2.0".to_string(),
-                            id: request_id,
-                            result: Some(
-                                serde_json::to_value(&result)
-                                    .map_err(|e| format!("Failed to serialize result: {}", e))
-                                    .expect("Serialization of tools call result should not fail"),
-                            ),
-                            error: None,
-                        }
+                        let args_array = args
+                            .get("args")
+                            .and_then(Value::as_array)
+                            .ok_or("Missing 'args' argument")?;
+
+                        let child_init_state = json!({
+                            "repository_path": repository_path,
+                            "git_args": args_array
+                                .iter()
+                                .filter_map(Value::as_str)
+                                .map(|s| s.to_string())
+                                .collect::<Vec<String>>(),
+                        });
+
+                        log(&format!(
+                            "Child init state: {}",
+                            child_init_state.to_string()
+                        ));
+
+                        let child_init_state_bytes = serde_json::to_vec(&child_init_state)
+                            .map_err(|e| format!("Failed to serialize child init state: {}", e))?;
+
+                        let actor_id = spawn(
+                            "/Users/colinrozzi/work/actor-registry/git-command-actor/manifest.toml",
+                            Some(&child_init_state_bytes),
+                        )
+                        .expect("Failed to spawn git-command actor");
+
+                        app_state
+                            .outstanding_requests
+                            .insert(actor_id.clone(), request_id.clone());
+
+                        None
                     }
                     _ => {
                         log(&format!("Unknown tool name: {}", name));
-                        McpResponse {
+                        let err_response = McpResponse {
                             jsonrpc: "2.0".to_string(),
                             id: request_id,
                             result: None,
@@ -176,20 +234,24 @@ impl MessageServerClient for Component {
                                 message: format!("Method '{}' not implemented", name),
                                 data: None,
                             }),
-                        }
+                        };
+
+                        log(&format!("Error response: {:?}", err_response));
+                        Some(
+                            serde_json::to_vec(&err_response).map_err(|e| {
+                                format!("Failed to serialize error response: {}", e)
+                            })?,
+                        )
                     }
                 }
             }
         };
 
-        log(&format!("Response: {:?}", mcp_response));
-
         // Serialize the app state
         let updated_state = serde_json::to_vec(&app_state).map_err(|e| e.to_string())?;
-        let response_bytes = serde_json::to_vec(&mcp_response).map_err(|e| e.to_string())?;
 
         // Return updated state
-        Ok((Some(updated_state), (Some(response_bytes),)))
+        Ok((Some(updated_state), (response,)))
     }
 
     fn handle_channel_open(
@@ -218,6 +280,145 @@ impl MessageServerClient for Component {
     ) -> Result<(Option<Vec<u8>>,), String> {
         log("mcp-actor: Received channel message");
         Ok((state,))
+    }
+}
+
+impl SupervisorHandlers for Component {
+    fn handle_child_error(
+        state: Option<Vec<u8>>,
+        params: (String, WitActorError),
+    ) -> Result<(Option<Vec<u8>>,), String> {
+        log("Handling child error in chat-state");
+
+        let (actor_id, result) = params;
+
+        log(&format!(
+            "Child actor {} encountered an error: {:?}",
+            actor_id, result
+        ));
+        let mut app_state: State = match state {
+            Some(state_bytes) if !state_bytes.is_empty() => serde_json::from_slice(&state_bytes)
+                .map_err(|e| format!("Failed to deserialize state: {}", e))?,
+            _ => return Err("Invalid state".to_string()),
+        };
+
+        // Check if the actor ID exists in outstanding requests
+        let request_id = app_state
+            .outstanding_requests
+            .get(&actor_id)
+            .cloned()
+            .ok_or_else(|| format!("No outstanding request found for actor ID {}", actor_id))?;
+
+        // Resolve the outstanding request, passing the error along
+        let response = McpResponse {
+            jsonrpc: "2.0".to_string(),
+            id: request_id.clone(),
+            result: None,
+            error: Some(McpError {
+                code: -32000, // Generic error code
+                message: format!("Child actor error: {:?}", result.data),
+                data: None,
+            }),
+        };
+
+        log(&format!("Response to outstanding request: {:?}", response));
+        let response_bytes = serde_json::to_vec(&response)
+            .map_err(|e| format!("Failed to serialize response: {}", e))?;
+        respond_to_request(&request_id, &response_bytes).expect("Failed to respond to request");
+
+        // Remove the actor from outstanding requests
+        app_state
+            .outstanding_requests
+            .remove(&actor_id)
+            .ok_or_else(|| format!("Actor ID {} not found in outstanding requests", actor_id))?;
+
+        // Serialize the updated state
+        let updated_state = serde_json::to_vec(&app_state).map_err(|e| e.to_string())?;
+        Ok((Some(updated_state),))
+    }
+
+    fn handle_child_exit(
+        state: Option<Vec<u8>>,
+        params: (String, Option<Vec<u8>>),
+    ) -> Result<(Option<Vec<u8>>,), String> {
+        log("Handling child exit in chat-state");
+
+        let (actor_id, result_bytes) = params;
+
+        let result = match result_bytes {
+            Some(bytes) => serde_json::from_slice::<GitCommandResult>(&bytes)
+                .map_err(|e| format!("Failed to deserialize result: {}", e))?,
+            None => GitCommandResult {
+                success: false,
+                exit_code: None,
+                stdout: String::new(),
+                stderr: String::new(),
+                command: Vec::new(),
+                execution_time_ms: None,
+                error: Some("Child exited without result".to_string()),
+                repository_path: String::new(),
+            },
+        };
+
+        let mut app_state: State = match state {
+            Some(state_bytes) if !state_bytes.is_empty() => serde_json::from_slice(&state_bytes)
+                .map_err(|e| format!("Failed to deserialize state: {}", e))?,
+            _ => return Err("Invalid state".to_string()),
+        };
+
+        log(&format!(
+            "Child actor {} exited with result: {:?}",
+            actor_id, result
+        ));
+
+        let request_id = app_state
+            .outstanding_requests
+            .remove(&actor_id)
+            .ok_or_else(|| format!("No outstanding request found for actor ID {}", actor_id))?;
+
+        // Prepare the response
+        let response = match result.success {
+            true => {
+                let tool_call_result = ToolCallResult {
+                    content: vec![ToolContent::Text {
+                        text: serde_json::to_string(&result.stdout)
+                            .unwrap_or_else(|_| "No stdout".to_string()),
+                    }],
+                    is_error: None,
+                };
+                McpResponse {
+                    jsonrpc: "2.0".to_string(),
+                    id: request_id.clone(),
+                    result: Some(
+                        serde_json::to_value(tool_call_result)
+                            .map_err(|e| format!("Failed to serialize result: {}", e))?,
+                    ),
+                    error: None,
+                }
+            }
+            false => McpResponse {
+                jsonrpc: "2.0".to_string(),
+                id: request_id.clone(),
+                result: None,
+                error: Some(McpError {
+                    code: -32000, // Generic error code
+                    message: serde_json::to_string(&result)
+                        .unwrap_or_else(|_| "Unknown error".to_string()),
+                    data: None,
+                }),
+            },
+        };
+
+        log(&format!("Response to outstanding request: {:?}", response));
+
+        let response_bytes = serde_json::to_vec(&response)
+            .map_err(|e| format!("Failed to serialize response: {}", e))?;
+
+        respond_to_request(&request_id, &response_bytes).expect("Failed to respond to request");
+
+        let updated_state = serde_json::to_vec(&app_state)
+            .map_err(|e| format!("Failed to serialize updated state: {}", e))?;
+        Ok((Some(updated_state),))
     }
 }
 

@@ -11,3 +11,8 @@ type = "message-server"
 type = "runtime"
 
 [handlers.config]
+
+[[handlers]]
+type = "supervisor"
+
+[handlers.config]
