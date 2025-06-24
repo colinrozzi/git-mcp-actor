@@ -1,0 +1,66 @@
+name: Release Actor
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on version tags like v0.1.0, v1.2.3, etc.
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Build and prepare release
+        uses: ./.github/actions/release-actor
+        
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            component.wasm
+            manifest.toml
+            init.json
+          body: |
+            ## 🎭 Task Monitor MCP Actor ${{ steps.version.outputs.VERSION }}
+            
+            This release contains the WebAssembly component and configuration files for the Task Monitor MCP Actor.
+            
+            ### What's Included
+            - `component.wasm` - The compiled WebAssembly actor component
+            - `manifest.toml` - Actor manifest with GitHub release URLs
+            - `init.json` - Initial state configuration
+            
+            ### Quick Start
+            
+            **Prerequisites:**
+            - Install and configure the `theater` CLI tool
+            - Ensure `theater-server-cli` is running
+            
+            **Run the actor:**
+            ```bash
+            theater start https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.VERSION }}/manifest.toml
+            ```
+            
+            ### Manifest URL
+            ```
+            https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.VERSION }}/manifest.toml
+            ```
+            
+            ### Available Tools
+            - `task_complete` - Mark tasks as completed and notify the management actor
+            
+            ### About
+            This actor implements the MCP (Model Context Protocol) to provide task monitoring capabilities within the theater actor system. It can be used to track task completion and communicate with management actors.
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
