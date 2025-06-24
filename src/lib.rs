@@ -140,7 +140,7 @@ impl MessageServerClient for Component {
 
                 let tools = vec![Tool {
                     name: "git-command".to_string(),
-                    description: Some("Run a git command".to_string()),
+                    description: Some("Run a git command. The arguments you provide will be run in a command: git -C {repository_path} {args}".to_string()),
                     input_schema: json!({
                         "type": "object",
                         "properties": {
