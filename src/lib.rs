@@ -19,6 +19,9 @@ use std::collections::HashMap;
 
 struct Component;
 
+const GIT_COMMAND_MANIFEST: &str =
+    "/Users/colinrozzi/work/actor-registry/git-command-actor/manifest.toml";
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct State {
     outstanding_requests: HashMap<String, String>,
@@ -211,11 +214,8 @@ impl MessageServerClient for Component {
                         let child_init_state_bytes = serde_json::to_vec(&child_init_state)
                             .map_err(|e| format!("Failed to serialize child init state: {}", e))?;
 
-                        let actor_id = spawn(
-                            "/Users/colinrozzi/work/actor-registry/git-command-actor/manifest.toml",
-                            Some(&child_init_state_bytes),
-                        )
-                        .expect("Failed to spawn git-command actor");
+                        let actor_id = spawn(GIT_COMMAND_MANIFEST, Some(&child_init_state_bytes))
+                            .expect("Failed to spawn git-command actor");
 
                         app_state
                             .outstanding_requests
