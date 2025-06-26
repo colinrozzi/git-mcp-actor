@@ -7,6 +7,6 @@ name = "theater:simple"
 registry = "wa.dev"
 
 [[packages.versions]]
-requirement = "*"
-version = "0.0.1"
-digest = "sha256:b7de0dc87eb1ac6f27b8e154dcd0c4a3ea52de4bff53586c14881efc74571db2"
+requirement = "^0.1.0"
+version = "0.1.0"
+digest = "sha256:3b1b6103d6cb37f744f4674b915eb1addcdc24a28eb7014a5032ba5320939bbd"

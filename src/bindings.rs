@@ -279,7 +279,7 @@ pub mod theater {
         ///
         /// ```wit
         /// // Using the runtime interface in a WIT definition
-        /// use ntwk:theater/runtime;
+        /// use theater:simple/runtime;
         ///
         /// // Using the runtime interface in a Rust implementation
         /// runtime::log("Actor initialized successfully");
@@ -3608,6 +3608,113 @@ pub mod exports {
                         }
                     }
                 }
+                #[doc(hidden)]
+                #[allow(non_snake_case)]
+                pub unsafe fn _export_handle_child_external_stop_cabi<T: Guest>(
+                    arg0: i32,
+                    arg1: *mut u8,
+                    arg2: usize,
+                    arg3: *mut u8,
+                    arg4: usize,
+                ) -> *mut u8 {
+                    #[cfg(target_arch = "wasm32")] _rt::run_ctors_once();
+                    let len1 = arg4;
+                    let bytes1 = _rt::Vec::from_raw_parts(arg3.cast(), len1, len1);
+                    let result2 = T::handle_child_external_stop(
+                        match arg0 {
+                            0 => None,
+                            1 => {
+                                let e = {
+                                    let len0 = arg2;
+                                    _rt::Vec::from_raw_parts(arg1.cast(), len0, len0)
+                                };
+                                Some(e)
+                            }
+                            _ => _rt::invalid_enum_discriminant(),
+                        },
+                        (_rt::string_lift(bytes1),),
+                    );
+                    let ptr3 = (&raw mut _RET_AREA.0).cast::<u8>();
+                    match result2 {
+                        Ok(e) => {
+                            *ptr3.add(0).cast::<u8>() = (0i32) as u8;
+                            let (t4_0,) = e;
+                            match t4_0 {
+                                Some(e) => {
+                                    *ptr3
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<u8>() = (1i32) as u8;
+                                    let vec5 = (e).into_boxed_slice();
+                                    let ptr5 = vec5.as_ptr().cast::<u8>();
+                                    let len5 = vec5.len();
+                                    ::core::mem::forget(vec5);
+                                    *ptr3
+                                        .add(3 * ::core::mem::size_of::<*const u8>())
+                                        .cast::<usize>() = len5;
+                                    *ptr3
+                                        .add(2 * ::core::mem::size_of::<*const u8>())
+                                        .cast::<*mut u8>() = ptr5.cast_mut();
+                                }
+                                None => {
+                                    *ptr3
+                                        .add(::core::mem::size_of::<*const u8>())
+                                        .cast::<u8>() = (0i32) as u8;
+                                }
+                            };
+                        }
+                        Err(e) => {
+                            *ptr3.add(0).cast::<u8>() = (1i32) as u8;
+                            let vec6 = (e.into_bytes()).into_boxed_slice();
+                            let ptr6 = vec6.as_ptr().cast::<u8>();
+                            let len6 = vec6.len();
+                            ::core::mem::forget(vec6);
+                            *ptr3
+                                .add(2 * ::core::mem::size_of::<*const u8>())
+                                .cast::<usize>() = len6;
+                            *ptr3
+                                .add(::core::mem::size_of::<*const u8>())
+                                .cast::<*mut u8>() = ptr6.cast_mut();
+                        }
+                    };
+                    ptr3
+                }
+                #[doc(hidden)]
+                #[allow(non_snake_case)]
+                pub unsafe fn __post_return_handle_child_external_stop<T: Guest>(
+                    arg0: *mut u8,
+                ) {
+                    let l0 = i32::from(*arg0.add(0).cast::<u8>());
+                    match l0 {
+                        0 => {
+                            let l1 = i32::from(
+                                *arg0.add(::core::mem::size_of::<*const u8>()).cast::<u8>(),
+                            );
+                            match l1 {
+                                0 => {}
+                                _ => {
+                                    let l2 = *arg0
+                                        .add(2 * ::core::mem::size_of::<*const u8>())
+                                        .cast::<*mut u8>();
+                                    let l3 = *arg0
+                                        .add(3 * ::core::mem::size_of::<*const u8>())
+                                        .cast::<usize>();
+                                    let base4 = l2;
+                                    let len4 = l3;
+                                    _rt::cabi_dealloc(base4, len4 * 1, 1);
+                                }
+                            }
+                        }
+                        _ => {
+                            let l5 = *arg0
+                                .add(::core::mem::size_of::<*const u8>())
+                                .cast::<*mut u8>();
+                            let l6 = *arg0
+                                .add(2 * ::core::mem::size_of::<*const u8>())
+                                .cast::<usize>();
+                            _rt::cabi_dealloc(l5, l6, 1);
+                        }
+                    }
+                }
                 pub trait Guest {
                     /// # Handle a child actor error
                     ///
@@ -3629,6 +3736,10 @@ pub mod exports {
                     fn handle_child_exit(
                         state: Option<_rt::Vec<u8>>,
                         params: (_rt::String, Option<_rt::Vec<u8>>),
+                    ) -> Result<(Option<_rt::Vec<u8>>,), _rt::String>;
+                    fn handle_child_external_stop(
+                        state: Option<_rt::Vec<u8>>,
+                        params: (_rt::String,),
                     ) -> Result<(Option<_rt::Vec<u8>>,), _rt::String>;
                 }
                 #[doc(hidden)]
@@ -3657,7 +3768,18 @@ pub mod exports {
                         "cabi_post_theater:simple/supervisor-handlers#handle-child-exit")]
                         unsafe extern "C" fn _post_return_handle_child_exit(arg0 : * mut
                         u8,) { unsafe { $($path_to_types)*::
-                        __post_return_handle_child_exit::<$ty > (arg0) } } };
+                        __post_return_handle_child_exit::<$ty > (arg0) } } #[unsafe
+                        (export_name =
+                        "theater:simple/supervisor-handlers#handle-child-external-stop")]
+                        unsafe extern "C" fn export_handle_child_external_stop(arg0 :
+                        i32, arg1 : * mut u8, arg2 : usize, arg3 : * mut u8, arg4 :
+                        usize,) -> * mut u8 { unsafe { $($path_to_types)*::
+                        _export_handle_child_external_stop_cabi::<$ty > (arg0, arg1,
+                        arg2, arg3, arg4) } } #[unsafe (export_name =
+                        "cabi_post_theater:simple/supervisor-handlers#handle-child-external-stop")]
+                        unsafe extern "C" fn _post_return_handle_child_external_stop(arg0
+                        : * mut u8,) { unsafe { $($path_to_types)*::
+                        __post_return_handle_child_external_stop::<$ty > (arg0) } } };
                     };
                 }
                 #[doc(hidden)]
@@ -3753,8 +3875,8 @@ pub(crate) use __export_default_impl as export;
 )]
 #[doc(hidden)]
 #[allow(clippy::octal_escapes)]
-pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 2240] = *b"\
-\0asm\x0d\0\x01\0\0\x19\x16wit-component-encoding\x04\0\x07\xc2\x10\x01A\x02\x01\
+pub static __WIT_BINDGEN_COMPONENT_TYPE: [u8; 2295] = *b"\
+\0asm\x0d\0\x01\0\0\x19\x16wit-component-encoding\x04\0\x07\xf9\x10\x01A\x02\x01\
 A\x15\x01B\x16\x01s\x04\0\x08actor-id\x03\0\0\x01s\x04\0\x0achannel-id\x03\0\x02\
 \x01p}\x01k\x04\x01r\x02\x08accepted\x7f\x07message\x05\x04\0\x0echannel-accept\x03\
 \0\x06\x01kw\x01r\x03\x0aevent-types\x06parent\x08\x04data\x04\x04\0\x05event\x03\
@@ -3799,13 +3921,15 @@ o\x02s\x06\x01o\x02\x07\x09\x01j\x01\x0d\x01s\x01@\x02\x05state\x07\x06params\x0
 \x13\x01o\x02\x03\x06\x01@\x02\x05state\x07\x06params\x14\0\x0a\x04\0\x16handle-\
 channel-message\x01\x15\x01o\x01\x03\x01@\x02\x05state\x07\x06params\x16\0\x0a\x04\
 \0\x14handle-channel-close\x01\x17\x04\0$theater:simple/message-server-client\x05\
-\x0b\x02\x03\0\0\x0fwit-actor-error\x01B\x0c\x02\x03\x02\x01\x0c\x04\0\x0fwit-ac\
+\x0b\x02\x03\0\0\x0fwit-actor-error\x01B\x0f\x02\x03\x02\x01\x0c\x04\0\x0fwit-ac\
 tor-error\x03\0\0\x01p}\x01k\x02\x01o\x02s\x01\x01o\x01\x03\x01j\x01\x05\x01s\x01\
 @\x02\x05state\x03\x06params\x04\0\x06\x04\0\x12handle-child-error\x01\x07\x01o\x02\
 s\x03\x01@\x02\x05state\x03\x06params\x08\0\x06\x04\0\x11handle-child-exit\x01\x09\
-\x04\0\"theater:simple/supervisor-handlers\x05\x0d\x04\0\x20colinrozzi:git-mcp-a\
-ctor/default\x04\0\x0b\x0d\x01\0\x07default\x03\0\0\0G\x09producers\x01\x0cproce\
-ssed-by\x02\x0dwit-component\x070.227.1\x10wit-bindgen-rust\x060.41.0";
+\x01o\x01s\x01@\x02\x05state\x03\x06params\x0a\0\x06\x04\0\x1ahandle-child-exter\
+nal-stop\x01\x0b\x04\0\"theater:simple/supervisor-handlers\x05\x0d\x04\0\x20coli\
+nrozzi:git-mcp-actor/default\x04\0\x0b\x0d\x01\0\x07default\x03\0\0\0G\x09produc\
+ers\x01\x0cprocessed-by\x02\x0dwit-component\x070.227.1\x10wit-bindgen-rust\x060\
+.41.0";
 #[inline(never)]
 #[doc(hidden)]
 pub fn __link_custom_section_describing_imports() {

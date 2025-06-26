@@ -420,6 +420,16 @@ impl SupervisorHandlers for Component {
             .map_err(|e| format!("Failed to serialize updated state: {}", e))?;
         Ok((Some(updated_state),))
     }
+
+    fn handle_child_external_stop(
+        state: Option<Vec<u8>>,
+        params: (String,),
+    ) -> Result<(Option<Vec<u8>>,), String> {
+        log("Handling child external stop in chat-state");
+        let actor_id = params.0;
+        log(&format!("Child actor {} requested external stop", actor_id));
+        Ok((state,))
+    }
 }
 
 bindings::export!(Component with_types_in bindings);

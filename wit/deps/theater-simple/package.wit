@@ -1754,7 +1754,7 @@ interface message-server-host {
 ///
 /// ```wit
 /// // Using the runtime interface in a WIT definition
-/// use ntwk:theater/runtime;
+/// use theater:simple/runtime;
 ///
 /// // Using the runtime interface in a Rust implementation
 /// runtime::log("Actor initialized successfully");
@@ -1955,6 +1955,8 @@ interface supervisor-handlers {
   handle-child-error: func(state: option<list<u8>>, params: tuple<string, wit-actor-error>) -> result<tuple<option<list<u8>>>, string>;
 
   handle-child-exit: func(state: option<list<u8>>, params: tuple<string, option<list<u8>>>) -> result<tuple<option<list<u8>>>, string>;
+
+  handle-child-external-stop: func(state: option<list<u8>>, params: tuple<string>) -> result<tuple<option<list<u8>>>, string>;
 }
 
 /// # WebSocket Server Interface
@@ -1974,7 +1976,7 @@ interface supervisor-handlers {
 ///
 /// ```wit
 /// // Using the websocket-server interface in a WIT definition
-/// use ntwk:theater/websocket-server;
+/// use theater:simple/websocket-server;
 ///
 /// // Implementing the interface in Rust
 /// impl websocket_server::Guest for MyActor {
