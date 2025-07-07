@@ -20,7 +20,7 @@ use std::collections::HashMap;
 struct Component;
 
 const GIT_COMMAND_MANIFEST: &str =
-    "https://github.com/colinrozzi/git-command-actor/releases/download/v0.1.0/manifest.toml";
+    "https://github.com/colinrozzi/git-command-actor/releases/latest/download/manifest.toml";
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct State {
