@@ -92,11 +92,9 @@ impl Guest for Component {
         let init_state = match state {
             Some(state_bytes) if !state_bytes.is_empty() => {
                 serde_json::from_slice::<InitState>(&state_bytes)
-                    .map_err(|e| format!("Failed to deserialize state: {}", e))?
+                    .unwrap_or_else(|_| InitState { repository_path: None })
             }
-            _ => InitState {
-                repository_path: None,
-            },
+            _ => InitState { repository_path: None },
         };
 
         let app_state = State {
