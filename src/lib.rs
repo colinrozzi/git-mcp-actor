@@ -84,10 +84,10 @@ pub struct GitCommandResult {
 impl Guest for Component {
     fn init(state: Option<Vec<u8>>, params: (String,)) -> Result<(Option<Vec<u8>>,), String> {
         // Initialize the component with the provided state and parameters
-        println!(
+        log(&format!(
             "Initializing with state: {:?} and params: {:?}",
             state, params
-        );
+        ));
 
         let init_state = match state {
             Some(state_bytes) if !state_bytes.is_empty() => {
