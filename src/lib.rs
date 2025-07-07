@@ -143,7 +143,7 @@ impl MessageServerClient for Component {
 
                 let tools = vec![Tool {
                     name: "git-command".to_string(),
-                    description: Some("Run a git command. The arguments you provide will be run in a command: git -C {repository_path} {args}".to_string()),
+                    description: Some("Execute a git command in the specified repository. Provide 'args' as an array of strings that will be passed to git. Example: args: ['status', '--porcelain'] runs 'git -C {repository_path} status --porcelain'".to_string()),
                     input_schema: json!({
                         "type": "object",
                         "properties": {
@@ -156,7 +156,7 @@ impl MessageServerClient for Component {
                                 "items": {
                                     "type": "string"
                                 },
-                                "description": "Arguments to pass to the git command"
+                                "description": "Array of command-line arguments to pass to git (e.g., ['status', '--porcelain'] or ['--version'])"
                             }
                         },
                         "required": ["repository_path"]
@@ -195,7 +195,7 @@ impl MessageServerClient for Component {
                         let args_array = args
                             .get("args")
                             .and_then(Value::as_array)
-                            .ok_or("Missing 'args' argument")?;
+                            .ok_or("Missing or invalid 'args' argument - expected array of strings")?;
 
                         let child_init_state = json!({
                             "repository_path": repository_path,
