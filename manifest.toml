@@ -2,50 +2,11 @@ name = "git-mcp-actor"
 version = "0.1.0"
 component = "/Users/colinrozzi/work/actor-registry/git-mcp-actor/./target/wasm32-unknown-unknown/release/git_mcp_actor.wasm"
 
-[permission_policy.message_server]
-type = "inherit"
-
-[permission_policy.file_system]
-type = "inherit"
-
-[permission_policy.http_client]
-type = "inherit"
-
-[permission_policy.http_framework]
-type = "inherit"
-
-[permission_policy.runtime]
-type = "inherit"
-
-[permission_policy.supervisor]
-type = "inherit"
-
-[permission_policy.store]
-type = "inherit"
-
-[permission_policy.timing]
-type = "inherit"
-
-[permission_policy.process]
-type = "inherit"
-
-[permission_policy.environment]
-type = "inherit"
-
-[permission_policy.random]
-type = "inherit"
-
-[[handlers]]
+[[handler]]
 type = "message-server"
 
-[handlers.config]
-
-[[handlers]]
+[[handler]]
 type = "runtime"
 
-[handlers.config]
-
-[[handlers]]
+[[handler]]
 type = "supervisor"
-
-[handlers.config]
