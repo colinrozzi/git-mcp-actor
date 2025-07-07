@@ -23,7 +23,13 @@ const GIT_COMMAND_MANIFEST: &str =
     "https://github.com/colinrozzi/git-command-actor/releases/latest/download/manifest.toml";
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+struct InitState {
+    repository_path: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct State {
+    repository_path: Option<String>,
     outstanding_requests: HashMap<String, String>,
 }
 
@@ -83,8 +89,19 @@ impl Guest for Component {
             state, params
         );
 
+        let init_state = match state {
+            Some(state_bytes) if !state_bytes.is_empty() => {
+                serde_json::from_slice::<InitState>(&state_bytes)
+                    .map_err(|e| format!("Failed to deserialize state: {}", e))?
+            }
+            _ => InitState {
+                repository_path: None,
+            },
+        };
+
         let app_state = State {
             outstanding_requests: HashMap::new(),
+            repository_path: init_state.repository_path,
         };
 
         Ok((Some(
@@ -141,15 +158,26 @@ impl MessageServerClient for Component {
             McpActorRequest::ToolsList {} => {
                 log("Received tools_list request");
 
+                let description = match &app_state.repository_path {
+                    Some(repo_path) => format!(
+                        "Execute a git command in the configured repository: '{}'. Provide 'args' as an array of strings. You can optionally override the repository by providing 'repository_path'. Example: args: ['status', '--porcelain']",
+                        repo_path
+                    ),
+                    None => "Execute a git command. You must provide both 'repository_path' and 'args' as an array of strings. Example: repository_path: '/path/to/repo', args: ['status', '--porcelain']".to_string(),
+                };
+
                 let tools = vec![Tool {
                     name: "git-command".to_string(),
-                    description: Some("Execute a git command in the specified repository. Provide 'args' as an array of strings that will be passed to git. Example: args: ['status', '--porcelain'] runs 'git -C {repository_path} status --porcelain'".to_string()),
+                    description: Some(description),
                     input_schema: json!({
                         "type": "object",
                         "properties": {
                             "repository_path": {
                                 "type": "string",
-                                "description": "The path of the git repo"
+                                "description": match &app_state.repository_path {
+                                    Some(_) => "Override the configured repository path (optional)",
+                                    None => "The path of the git repository (required)",
+                                }
                             },
                             "args" : {
                                 "type": "array",
@@ -159,7 +187,10 @@ impl MessageServerClient for Component {
                                 "description": "Array of command-line arguments to pass to git (e.g., ['status', '--porcelain'] or ['--version'])"
                             }
                         },
-                        "required": ["repository_path"]
+                        "required": match &app_state.repository_path {
+                            Some(_) => vec![], // No required fields if repo is configured
+                            None => vec!["repository_path"], // Require repo path if not configured
+                        }
                     }),
                     annotations: None,
                 }];
@@ -187,15 +218,17 @@ impl MessageServerClient for Component {
                     "git-command" => {
                         log("Processing git-command call");
 
-                        let repository_path = args
-                            .get("repository_path")
-                            .and_then(Value::as_str)
-                            .ok_or("Missing 'repository_path' argument")?;
+                        // Get repository path from call args or fall back to init state
+                        let repository_path = match args.get("repository_path").and_then(Value::as_str) {
+                            Some(path) => path.to_string(),
+                            None => app_state.repository_path.as_ref()
+                                .ok_or("No repository path provided in call arguments or initialization state")?
+                                .clone(),
+                        };
 
-                        let args_array = args
-                            .get("args")
-                            .and_then(Value::as_array)
-                            .ok_or("Missing or invalid 'args' argument - expected array of strings")?;
+                        let args_array = args.get("args").and_then(Value::as_array).ok_or(
+                            "Missing or invalid 'args' argument - expected array of strings",
+                        )?;
 
                         let child_init_state = json!({
                             "repository_path": repository_path,
